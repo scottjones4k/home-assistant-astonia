@@ -1,0 +1,8 @@
+{
+    "name": "Astonia 3 Custom Component",
+    "render_readme": true,
+    "domains": [
+      "sensor",
+      "binary_sensor"
+    ]
+  }
