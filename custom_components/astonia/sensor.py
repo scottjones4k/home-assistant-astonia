@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import AstoniaCoordinator
+from datetime import datetime, timezone
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
@@ -22,6 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     for char in characters:
         entities.append(AstoniaLevelSensor(coordinator, entry.entry_id, char))
         entities.append(AstoniaClassSensor(coordinator, entry.entry_id, char))
+        entities.append(AstoniaLastOnlineSensor(coordinator, entry.entry_id, char))
 
     async_add_entities(entities)
 
@@ -122,6 +124,24 @@ class AstoniaClassSensor(_BaseAstoniaSensor):
             clz = me.get("clazz")
             if isinstance(clz, str) and clz.strip():
                 self._native_value = clz.strip()
+
+    def _restore_from_state(self, state: str, attrs: dict[str, Any]) -> None:
+        self._native_value = state if state not in (None, "unknown", "unavailable", "") else None
+
+class AstoniaLastOnlineSensor(_BaseAstoniaSensor):
+    def __init__(self, coordinator: AstoniaCoordinator, entry_id: str, char_name: str) -> None:
+        super().__init__(coordinator, entry_id, char_name)
+        self._attr_name = f"{self._char} Last Online"
+        self._attr_unique_id = f"{DOMAIN}:{entry_id}:{self._key}:last_online"
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP
+    @property
+    def native_value(self) -> Optional[str]:
+        return self._native_value
+
+    def _on_snapshot(self, me: dict | None) -> None:
+        if me is not None:
+            # Set last_online to current UTC time when player is present
+            self._native_value = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
     def _restore_from_state(self, state: str, attrs: dict[str, Any]) -> None:
         self._native_value = state if state not in (None, "unknown", "unavailable", "") else None
